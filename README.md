@@ -1,6 +1,6 @@
 Date_june24_2026
 
-The chatroom web-app was built during official University view on 6 months of development (Oct2025-Feb2026) inside a Minikube cluster for local
+The chatroom web-app was built during official University thesison 6 months of development (Oct2025-Feb2026) inside a Minikube cluster for local
 Kubernetes development. Later updated and downgrated into a triple-container webapp that can support more containers in addition making use of the Docker
 multi-container architecture. 
 
