@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title> · Webchat ·</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1>Δώσε Username + Roomname (2–5 χρήστες ανά δωμάτιο) · Socket.IO</h1>
+      <span class="tag">History persists via SQLite</span>
+    </header>
+
+    <div style="padding: 12px; border-bottom: 1px solid #1f2937;">
+      <div class="row">
+        <div class="field">
+          <label>Username</label>
+          <input id="username" type="text" placeholder="Alice" autocomplete="off" />
+        </div>
+        <div class="field">
+          <label>Room</label>
+          <input id="room" type="text" placeholder="1" autocomplete="off" />
+        </div>
+      </div>
+      <div style="display:flex; gap:8px; align-items:center; margin-top:8px; flex-wrap: wrap;">
+        <button class="btn join" id="joinBtn">Create Room</button>
+        <button class="btn exit" id="exitBtn" disabled>Exit Room</button>
+        <div class="status" id="status">Not connected</div>
+        <div class="pill room-pill" id="roomBadge" style="display:none;"></div>
+      </div>
+    </div>
+
+    <main>
+      <aside class="sidebar">
+        <div class="participants">
+          <h3>Participants</h3>
+          <div id="participants"></div>
+        </div>
+        <div class="rooms">
+          <h3>Rooms</h3>
+          <div id="roomList"></div>
+        </div>
+      </aside>
+
+      <section class="chat">
+        <div class="messages" id="messages"></div>
+        <div class="typing" id="typing"></div>
+        <div class="composer">
+          <input id="input" type="text" placeholder="Type a message..." disabled />
+          <button class="send" id="sendBtn" disabled>Send</button>
+        </div>
+      </section>
+    </main>
+
+    <button id="welcomeButton">Ας συνομιλήσουμε με λίγα κλίκ ! </button>
+    <div id="welcomeOverlay"></div>
+  </div>
+
+  <audio id="welcomeSound" src="welcome-sound.mp3" preload="auto"></audio>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io("/", { transports: ["websocket", "polling"] });
+
+    const el = (id) => document.getElementById(id);
+    const statusEl = el("status");
+    const roomListEl = el("roomList");
+    const participantsEl = el("participants");
+    const messagesEl = el("messages");
+    const typingEl = el("typing");
+    const inputEl = el("input");
+    const sendBtn = el("sendBtn");
+    const joinBtn = el("joinBtn");
+    const exitBtn = el("exitBtn");
+    const welcomeButton = el("welcomeButton");
+    const welcomeOverlay = el("welcomeOverlay");
+
+    let myName = "";
+    let myRoom = "";
+    let typingTimeout;
+
+    // Show the welcome button on page load
+    window.onload = function() {
+      welcomeButton.style.display = 'block';
+      welcomeOverlay.style.display = 'block';
+
+      welcomeButton.onclick = function() {
+        welcomeButton.style.opacity = '0';
+        welcomeOverlay.style.display = 'none';
+        setTimeout(() => {
+          welcomeButton.style.display = 'none';
+        }, 1000);
+      };
+    };
+
+    function formatTime(ts) { //time format
+      const d = new Date(ts);
+      return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    }
+
+    function addSystem(text, time = Date.now()) { 
+      const div = document.createElement("div");
+      div.className = "sys";
+      div.textContent = text;
+      div.dataset.time = time;
+      messagesEl.appendChild(div);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    function addMessage({ from, text, time }) {
+      const wrap = document.createElement("div");
+      const mine = from === myName;
+      wrap.className = "msg " + (mine ? "me" : "other");
+      wrap.textContent = text;
+      messagesEl.appendChild(wrap);
+      const meta = document.createElement("div");
+      meta.className = "meta";
+      meta.textContent = `${from} • ${formatTime(time)}`;
+      messagesEl.appendChild(meta);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    function renderHistory(history) {
+      messagesEl.innerHTML = "";
+      (history || []).forEach(entry => {
+        if (entry.isSystem) {
+          addSystem(entry.text || `${entry.username} ${entry.type === "join" ? "entered" : "left"}`, entry.time);
+        } else {
+          addMessage(entry);
+        }
+      });
+    }
+//Λίστα Συμμετεχόντων
+    function updateParticipants(list) {
+      participantsEl.innerHTML = "";
+      list.forEach(u => {
+        const p = document.createElement("span");
+        p.className = "pill";
+        p.textContent = u;
+        participantsEl.appendChild(p);
+      });
+    }
+//UI όταν είσαι μέσα σε room
+    function setInRoomUI(inRoom) {
+      inputEl.disabled = !inRoom;
+      sendBtn.disabled = !inRoom;
+      exitBtn.disabled = !inRoom;
+      joinBtn.disabled = inRoom;
+      if (!inRoom) {
+        typingEl.textContent = "";
+        messagesEl.innerHTML = ""; // Clear messages on exit
+      }
+    }
+// Join Room 
+    function joinRoom(room) {
+      const username = el("username").value.trim();
+      if (!username || !room) {  //έλεγχος για το αν υπάρχει το username
+        statusEl.textContent = "Enter username and room"; 
+        return; 
+      }
+      socket.emit("join", { username, room }, (res) => { //socket.io σημα για join 
+        if (!res?.ok) {
+          statusEl.textContent = res?.error || "Join failed";
+          return;
+        }
+        myName = username; 
+        myRoom = room;
+        statusEl.textContent = `Joined room: ${room}`; //κατάσταση εισοδου σε room
+        setInRoomUI(true);
+      });
+    }
+//Ανανέωση Λίστας room 
+    function updateRoomList(room) {
+      const existingRoom = Array.from(roomListEl.children).some(item => {
+        return item.firstChild.textContent === room;
+      }); 
+
+      if (existingRoom) {//Flag
+        return; // If the room already exists, do not add it again
+      }
+      const roomItem = document.createElement("div");
+      roomItem.className = "room-item";
+
+                  const roomButton = document.createElement("button");
+                  roomButton.className = "btn"; 
+                  roomButton.textContent = room;
+                  roomButton.onclick = () => joinRoom(room); // Join room on click
+
+                    const deleteButton = document.createElement("button");
+                    deleteButton.className = "btn"; 
+                    deleteButton.textContent = "Delete";
+                    deleteButton.onclick = () => {
+                      deleteRoom(room); // Delete room on click
+                    };
+        roomItem.appendChild(roomButton);
+        roomItem.appendChild(deleteButton);
+        roomListEl.appendChild(roomItem);
+    }
+
+    function deleteRoom(room) {
+      socket.emit("deleteRoom", room, (res) => {
+        if (res?.ok) {
+          const items = Array.from(roomListEl.children);
+          items.forEach(item => {
+            if (item.firstChild.textContent === room) {
+              roomListEl.removeChild(item);
+            }
+          });
+          statusEl.textContent = `Room "${room}" deleted successfully.`;
+        } else {
+          console.error(res?.error || "Delete failed");
+        }
+      });
+    }
+
+    // Socket event to update room list from server
+    socket.on("roomListUpdated", (rooms) => {
+      roomListEl.innerHTML = ""; // Clear current room list
+      rooms.forEach(room => updateRoomList(room)); // Re-render room buttons
+    });
+
+    socket.on("connect", () => { 
+      statusEl.textContent = "Connected"; 
+    });
+    socket.on("disconnect", () => { 
+      statusEl.textContent = "Disconnected"; 
+      setInRoomUI(false); 
+    });
+
+    socket.on("history", (history) => renderHistory(history));
+    socket.on("system", (evt) => {
+      if (evt.type === "join") addSystem(evt.text || `${evt.username} has entered the room`, evt.time);
+      if (evt.type === "leave") addSystem(evt.text || `${evt.username} has left the room`, evt.time);
+    });
+    socket.on("participants", (list) => updateParticipants(list));
+    socket.on("message", (msg) => addMessage(msg));
+    socket.on("typing", ({ username, isTyping }) => {
+      typingEl.textContent = isTyping ? `${username} is typing...` : "";
+    });
+
+    inputEl.addEventListener("input", () => {
+      socket.emit("typing", true);
+      clearTimeout(typingTimeout);
+      typingTimeout = setTimeout(() => socket.emit("typing", false), 900);
+    });
+
+    inputEl.addEventListener("keydown", (e) => { 
+      if (e.key === "Enter") { 
+        e.preventDefault(); 
+        const text = inputEl.value.trim();
+        if (text) {
+          socket.emit("message", text);
+          inputEl.value = "";
+          socket.emit("typing", false);
+        }
+      }
+    });
+
+    sendBtn.addEventListener("click", () => {
+      const text = inputEl.value.trim();
+      if (text) {
+        socket.emit("message", text);
+        inputEl.value = "";
+        socket.emit("typing", false);
+      }
+    });
+
+    joinBtn.addEventListener("click", () => {
+      const room = el("room").value.trim();
+      // Check if the room already exists before joining or creating
+      const existingRoom = Array.from(roomListEl.children).some(item => {
+        return item.firstChild.textContent === room;
+      });
+      if(!existingRoom){
+          updateRoomList(room); // Add the room to the list if it doesn't already exist
+        }
+      joinRoom(room);
+      });
+
+    exitBtn.addEventListener("click", () => {
+      socket.emit("exitRoom", (res) => {
+        if (!res?.ok) { 
+          statusEl.textContent = res?.error || "Exit failed"; 
+          return; 
+        }
+        addSystem(`You left ${res.room}`);
+        myRoom = "";
+        setInRoomUI(false);
+      });
+    });
+  </script>
+</body>
+</html>

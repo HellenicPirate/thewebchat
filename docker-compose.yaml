@@ -1,0 +1,43 @@
+version: "3.9"
+
+services:
+  backend:
+    build: ./backend
+    container_name: webchat-backend
+    environment:
+      - NODE_ENV=production
+      - SQLITE_PATH=/data/chat.sqlite
+      - ROOM_MIN=2
+      - ROOM_MAX=5
+      - HISTORY_LIMIT=500
+    volumes:
+      - chat_data:/data
+    expose:
+      - "3000"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/healthcheck.sh"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  frontend:
+    build: ./frontend
+    container_name: webchat-frontend
+    expose:
+      - "80"
+    restart: unless-stopped
+
+  nginx:
+    build: ./server
+    container_name: webchat-nginx
+    depends_on:
+      - frontend
+      - backend
+    ports:
+      - "80:80"
+    restart: unless-stopped
+
+volumes:
+  chat_data:
