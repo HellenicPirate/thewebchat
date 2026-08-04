@@ -1,10 +1,21 @@
-Το compose δουλευει στις 06/06/2026 . Ειχε γινει λαθος στο docker desktop config , το διορθωσα, κατι εγινε με κάποιο update στον kernel του linux . 
-    Τρέχει οπουδήποτε υπάρχει εγκατεστημένο το Docker , με την εντολή docker compose up . Ισως λανει κάποιο download . Αν κάνει και δνε έλουμε να το 
-    διακινδυνεύσουμε τρέχουμε το --> docker compose start .
-    χωρις επανακατασκευή των containers μας , για επανεκίννηση τρέχουμε το --> docker compose restart 
-    για προβολή τρέχοντος / τρεχόντων containers type --> docker compose ps 
-    για προβολή της εφαρμογής μέσω του nginx στο τερματικό τρέχουμε το --> curl -Ik http://localhost:80
-    Ανοίγουμε 2-5 διαφορετικά incognito browser tabs και ξεκινάμε να συνομιλούμε δίνοντας username και roomname, έπειτα πατάμε join room . 
-    Το κάθε room μπορεί να διαγραφεί ΜΟΝΟ αφού έχουν κάνει exit όλοι οι συμμετέχοντες .
+The webchat project started as an official thesis for my University Deggree using an application inside multiple Docker containers that were later transformed into yaml files for manifesting deployment/services/pods for Kubernetes testing with the help of a tool called Minikube . 
+
+Technologies used : 
+Backend : 
+    Node.js (server)
+    Express.js (app creation for https)
+    Javascript (serve source  code)
+    SOcket.io (web sockets for users + chatrooms)
+    A helper Shell script for the database + SQLite
+Frontend: 
+    HTML (structure of UI)
+    CSS (Customisation for UI )
+    Javascript (Client side for Async/Await , socket.io, WebRTC for voice call functionality)
+Reverse Proxy/Load Balancer :
+    NGINX (configuration for trafficing inside the architecture) 
+Docker + Docker compose for automatation
 
 
+
+
+Later was downgraded into a 3-containers orchastration app . Today it is still under development for scaling and upgrading .
