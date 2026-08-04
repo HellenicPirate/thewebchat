@@ -16,6 +16,4 @@ Reverse Proxy/Load Balancer :
 Docker + Docker compose for automatation
 
 
-
-
-Later was downgraded into a 3-containers orchastration app . Today it is still under development for scaling and upgrading .
+Later was downgraded into a 3-containers orchestration app . Today it is still under development for scaling and upgrading . It runs anywhere Docker runs with a simple docker-compose up command without installing aditional software of missing libraries, Docker handles these . By typing https://<HOST-IP:443> after generating ssl key certification succesfully for the (WebRTC blockage) the app can be used inside any secure LAN .
