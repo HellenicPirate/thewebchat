@@ -1,0 +1,33 @@
+#Dependencies
+node_modules/
+
+#Environment & Secrets
+.env
+.env.local
+.env.*.local
+
+# Databases & Data
+*.sqllite
+*.db
+/data/
+chat_data/
+
+#Certifications (Never commit private keys)
+server/certs/*.keys
+server/certs/*.pem
+WebChat-comp/server/certs/localhost.key
+WebChat-comp/server/certs/localhost.crt
+
+
+
+#Logs & OS files
+*.log
+.DS_Store
+Thumbs.db
+
+#Docker
+.dockerignore
+
+#Build artifacts
+dist/
+build/
